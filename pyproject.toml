@@ -2,6 +2,7 @@
 name = "salt-fga"
 dynamic = ["version"]
 requires-python = ">=3.12"
+readme = "README.md"
 dependencies = [
     "fire>=0.7.1",
     "openfga-sdk>=0.9.9",
