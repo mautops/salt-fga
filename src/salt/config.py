@@ -1,7 +1,6 @@
 """配置管理模块 - 读取和管理 Salt 环境配置"""
 
 import json
-import os
 from pathlib import Path
 from typing import Dict, List, Optional
 

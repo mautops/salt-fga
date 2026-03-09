@@ -1,6 +1,7 @@
 """minions 命令 - 查看和管理 minions"""
 
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 from openfga import require_permission
 
@@ -15,15 +16,16 @@ class MinionsCommand:
     Attributes:
         client: Salt API 客户端。
         formatter: 输出格式化器。
-        permission_checker: 权限检查器（可选）。
+        no_auth: 是否跳过权限检查。
         cluster_name: 集群名称。
     """
 
-    def __init__(self, client: SaltAPIClient, formatter: OutputFormatter, permission_checker=None, cluster_name: str = "default"):
+    def __init__(self, client: SaltAPIClient, formatter: OutputFormatter, no_auth: bool = False, cluster_name: str = "default", username: str = None):
         self.client = client
         self.formatter = formatter
-        self.permission_checker = permission_checker
+        self.no_auth = no_auth
         self.cluster_name = cluster_name
+        self.username = username
 
     @require_permission("minions", target_param="mid")
     def __call__(self, mid: Optional[str] = None):

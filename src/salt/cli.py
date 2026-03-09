@@ -1,7 +1,9 @@
 """CLI 入口 - 使用 fire 管理命令行"""
 
 import getpass
+import os
 import sys
+import requests
 import fire
 
 from .auth import TokenManager
@@ -16,12 +18,28 @@ from .commands.jobs import JobsCommand
 from .commands.keys import KeysCommand
 from .commands.cmd import CmdCommand
 
-# 导入权限模块
-import sys, os
-
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__))))
-from openfga import PermissionChecker, PermissionCommand
-from openfga.config import OpenFGAConfigManager
+from openfga import PermissionCommand, load_config
+from openfga.commands import is_superadmin
+
+
+def _resolve_user() -> str:
+    """通过 COPAW_AUTH_TOKEN 调用 API 获取当前用户 ID。
+
+    Returns:
+        user_id 字符串，未设置 token 时返回 None。
+    """
+    token = os.environ.get("COPAW_AUTH_TOKEN")
+    if not token:
+        return None
+    api_base = os.environ.get("COPAW_API_BASE_URL", "http://localhost:8088")
+    resp = requests.get(
+        f"{api_base}/api/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=5,
+    )
+    resp.raise_for_status()
+    return resp.json()["user_id"]
 
 
 class SaltCLI:
@@ -35,70 +53,67 @@ class SaltCLI:
             raw: 是否使用原始输出（--raw）。
             no_auth: 是否禁用权限检查（--no-auth，需要管理员权限）。
         """
-        # 验证 no_auth 参数的使用权限（仅管理员可用）
         if no_auth:
             self._verify_no_auth_permission()
+
+        try:
+            user = _resolve_user() if not no_auth else None
+        except Exception as e:
+            print(f"错误: 获取用户身份失败: {e}", file=sys.stderr)
+            sys.exit(1)
 
         self.config_manager = ConfigManager()
         self.config_manager.ensure_config_dir()
 
-        # 获取环境配置
         try:
             self.cluster_config = self.config_manager.get_cluster(cluster)
         except Exception as e:
             print(f"错误: {e}", file=sys.stderr)
             sys.exit(1)
 
-        # 获取环境名称
         cluster_name = self.cluster_config.name
 
-        # 初始化组件
         self.token_manager = TokenManager(self.config_manager.config_dir)
         self.client = SaltAPIClient(self.cluster_config, self.token_manager)
         self.formatter = OutputFormatter(raw=raw)
 
-        # 初始化权限检查器（从 OpenFGA 配置加载，默认启用）
-        perm_checker = PermissionChecker(enabled=not no_auth)
-
-        # 注册子命令，传入权限检查器
         self.clusters = ClustersCommand(self.config_manager, self.formatter)
-        self.ping = PingCommand(self.client, self.formatter, perm_checker, cluster_name)
+        self.ping = PingCommand(
+            self.client, self.formatter, no_auth, cluster_name, user
+        )
         self.execute = ExecuteCommand(
-            self.client, self.formatter, perm_checker, cluster_name
+            self.client, self.formatter, no_auth, cluster_name, user
         )
         self.minions = MinionsCommand(
-            self.client, self.formatter, perm_checker, cluster_name
+            self.client, self.formatter, no_auth, cluster_name, user
         )
-        self.jobs = JobsCommand(self.client, self.formatter, perm_checker, cluster_name)
-        self.keys = KeysCommand(self.client, self.formatter, perm_checker, cluster_name)
-        self.cmd = CmdCommand(self.client, self.formatter, perm_checker, cluster_name)
+        self.jobs = JobsCommand(
+            self.client, self.formatter, no_auth, cluster_name, user
+        )
+        self.keys = KeysCommand(
+            self.client, self.formatter, no_auth, cluster_name, user
+        )
+        self.cmd = CmdCommand(self.client, self.formatter, no_auth, cluster_name, user)
 
-        # 权限管理命令
         self.permission = PermissionCommand()
 
     @staticmethod
     def _verify_no_auth_permission() -> None:
-        """验证当前用户是否有权限使用 --no-auth 参数。
-
-        从 OpenFGA 配置文件读取管理员列表，只有管理员才能禁用权限检查。
-
-        Raises:
-            SystemExit: 当用户不是管理员或配置未设置时，打印错误并退出。
-        """
-        openfga_config = OpenFGAConfigManager().load()
-        current_user = getpass.getuser()
-
-        if not openfga_config.admins:
-            print(
-                "错误: --no-auth 需要管理员权限，但权限系统未配置管理员列表。\n"
-                "请在 ~/.config/salt/openfga.json 中添加 admins 字段。",
-                file=sys.stderr,
-            )
+        config = load_config()
+        if not config.is_initialized():
+            return
+        user = getpass.getuser()
+        try:
+            allowed = is_superadmin(config, user)
+        except Exception as e:
+            print(f"错误: 超级管理员权限检查失败: {e}", file=sys.stderr)
             sys.exit(1)
-
-        if not openfga_config.is_admin(current_user):
+        if not allowed:
             print(
-                f"错误: 用户 '{current_user}' 没有使用 --no-auth 的权限，需要管理员身份。",
+                f"错误: 用户 '{user}' 不是超级管理员，无法使用 --no-auth 参数。\n"
+                f"请让现有超管通过 fga CLI 授权:\n"
+                f"  fga tuple write --store-id {config.store_id} "
+                f'\'[{{"user":"user:{user}","relation":"admin","object":"cluster:system"}}]\'',
                 file=sys.stderr,
             )
             sys.exit(1)

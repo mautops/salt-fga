@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 核心架构
 
 ### 多环境配置管理
+
 - 配置文件位置: `~/.config/salt/credentials.json`（用户级配置，不纳入版本控制）
 - 配置格式为 JSON 数组，每个环境包含：
   - `name`: 环境名称（如 prod, dev, test）
@@ -22,6 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 如果未指定环境，使用配置文件中的第一个环境作为默认环境
 
 ### API 认证流程
+
 - 使用 `/login` 端点获取认证 token
 - 登录响应格式：`{"return": {"token": "...", "expire": 1234567890.0, ...}}`（部分版本可能返回列表格式）
 - Token 通过 `X-Auth-Token` header 传递给后续请求
@@ -30,6 +32,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Token 过期时自动重新登录并刷新缓存
 
 ### 项目结构设计
+
 ```
 salt/
 ├── pyproject.toml          # 项目配置和依赖
@@ -74,6 +77,7 @@ salt/
 ```
 
 ### 技术栈
+
 - **fire**: CLI 参数管理，自动将类方法转换为命令行接口
 - **requests**: HTTP 客户端，调用 Salt API
 - **rich**: 终端输出美化，支持表格、JSON、进度条等
@@ -82,7 +86,9 @@ salt/
 ## 开发规范
 
 ### 命令实现模式
+
 每个子命令应该：
+
 1. 在 `src/salt/commands/` 目录下创建独立的 Python 文件
 2. 实现一个类，包含命令的主要逻辑
 3. 通过 `cli.py` 中的 fire 自动注册为子命令
@@ -91,6 +97,7 @@ salt/
 6. 使用 `formatter.py` 格式化输出
 
 ### API 调用示例
+
 ```python
 # 标准的 Salt API 请求格式
 {
@@ -103,6 +110,7 @@ salt/
 ```
 
 ### 输出格式化
+
 - 默认使用 rich 美化输出（表格、颜色、JSON 高亮）
 - 提供 `--raw` 参数支持原始输出
 - 错误信息使用 rich 的 `Console.print_exception()` 展示
@@ -110,6 +118,7 @@ salt/
 ## 常用命令
 
 ### 开发环境设置
+
 ```bash
 # 安装依赖
 uv sync
@@ -119,24 +128,25 @@ source .venv/bin/python
 ```
 
 ### 运行 CLI
+
 ```bash
 # 查看所有环境
-salt clusters
+salt-fga clusters
 
 # 使用默认环境执行命令
-salt ping
+salt-fga ping
 
 # 指定环境执行命令
-salt -c prod ping
-salt -c prod ping --tgt "minion-001"
-salt -c prod cmd --tgt "*" --command "df -h"
-salt -c prod execute --tgt "minion-001" --script_content "#!/bin/bash\necho hello\nhostname"
-salt -c prod minions
-salt -c prod jobs
-salt -c prod keys
+salt-fga -c prod ping
+salt-fga -c prod ping --tgt "minion-001"
+salt-fga -c prod cmd --tgt "*" --command "df -h"
+salt-fga -c prod execute --tgt "minion-001" --script_content "#!/bin/bash\necho hello\nhostname"
+salt-fga -c prod minions
+salt-fga -c prod jobs
+salt-fga -c prod keys
 
 # 原始 JSON 输出
-salt --raw ping
+salt-fga --raw ping
 
 # 开发模式运行
 uv run python -m salt.cli clusters
@@ -144,6 +154,7 @@ uv run python -m salt.cli -c prod ping
 ```
 
 ### 测试
+
 ```bash
 # 运行所有测试
 uv run pytest

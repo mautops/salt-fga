@@ -7,7 +7,6 @@ from rich.console import Console
 from rich.json import JSON
 from rich.table import Table
 from rich.panel import Panel
-from rich.syntax import Syntax
 
 
 class OutputFormatter:

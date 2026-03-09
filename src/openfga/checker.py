@@ -1,200 +1,111 @@
-"""OpenFGA 权限检查器"""
-
-import getpass
-from functools import wraps
-from typing import Optional, Callable, Any
 import inspect
+from functools import wraps
+from typing import Callable, Any
 
-from .config import OpenFGAConfig, OpenFGAConfigManager
-from .client import OpenFGAClientWrapper
+from openfga_sdk.sync import OpenFgaClient
+from openfga_sdk import ClientConfiguration
+from openfga_sdk.client.models.check_request import ClientCheckRequest
 
-
-class PermissionDeniedError(Exception):
-    """权限被拒绝异常。
-
-    Attributes:
-        user: 发起请求的用户名。
-        command: 被拒绝的命令。
-        target: 目标主机。
-        cluster: 集群名称。
-        reason: 拒绝的详细原因。
-    """
-
-    def __init__(self, user: str, command: str, target: str, cluster: str, reason: str = ""):
-        self.user = user
-        self.command = command
-        self.target = target
-        self.cluster = cluster
-        self.reason = reason
-        msg = f"权限被拒绝: user={user}, command={command}, target={target}, cluster={cluster}"
-        if reason:
-            msg += f" - {reason}"
-        super().__init__(msg)
+from .config import load_config, OpenFGAConfig
 
 
-class PermissionChecker:
-    """OpenFGA 权限检查器。
-
-    权限检查逻辑:
-        1. 用户是否是 cluster 的 member
-        2. 用户对 command 是否有 can_execute 权限
-        3. target 归属的 target_group
-        4. 用户对 target_group 是否有 can_access 权限
-
-    Attributes:
-        config: OpenFGA 连接配置。
-        enabled: 是否启用权限检查，False 时所有检查直接通过。
-        client: OpenFGA 客户端，未初始化时为 None。
-    """
-
-    def __init__(self, config: Optional[OpenFGAConfig] = None, enabled: bool = True):
-        if config is None:
-            config = OpenFGAConfigManager().load()
-
-        self.config = config
-        self.enabled = enabled
-        self.client = OpenFGAClientWrapper(config) if config.is_initialized() else None
-
-    def get_current_user(self) -> str:
-        """获取当前用户名。
-
-        仅使用系统登录用户，不信任环境变量（防止伪造）。
-
-        Returns:
-            当前用户名字符串。
-        """
-        return getpass.getuser()
-
-    def check(self, command: str, target: str, cluster: str, user: Optional[str] = None) -> bool:
-        """检查用户是否有权限执行命令。
-
-        Args:
-            command: 命令名称，如 "ping"、"cmd"。
-            target: 目标主机名。
-            cluster: 集群名称。
-            user: 用户名，默认读取当前用户。
-
-        Returns:
-            True 表示有权限，False 表示无权限或检查失败。
-        """
-        if not self.enabled:
-            return True
-
-        if not self.client:
-            return False
-
-        if user is None:
-            user = self.get_current_user()
-
-        try:
-            if not self.client.check(f"user:{user}", "member", f"cluster:{cluster}"):
-                return False
-            if not self.client.check(f"user:{user}", "can_execute", f"command:{command}"):
-                return False
-            if not self.client.check(f"user:{user}", "can_access", f"target:{target}"):
-                return False
-            return True
-
-        except Exception as e:
-            print(f"权限检查失败: {e}")
-            return False
-
-    def require(self, command: str, target: str, cluster: str, user: Optional[str] = None) -> None:
-        """检查权限，无权限时抛出 PermissionDeniedError。
-
-        Args:
-            command: 命令名称。
-            target: 目标主机名。
-            cluster: 集群名称。
-            user: 用户名，默认��取当前用户。
-
-        Raises:
-            PermissionDeniedError: 用户无权限时抛出，包含详细拒绝原因。
-        """
-        if user is None:
-            user = self.get_current_user()
-
-        if not self.check(command, target, cluster, user):
-            reason = self._get_denial_reason(user, command, target, cluster)
-            raise PermissionDeniedError(user, command, target, cluster, reason)
-
-    def _get_denial_reason(self, user: str, command: str, target: str, cluster: str) -> str:
-        """获取权限拒绝的详细原因，用于提示用户具体缺少哪项权限。
-
-        Args:
-            user: 用户名。
-            command: 命令名称。
-            target: 目标主机名。
-            cluster: 集群名称。
-
-        Returns:
-            人类可读的拒绝原因字符串。
-        """
-        if not self.client:
-            return "OpenFGA 未初始化，请先运行 'salt permission init'"
-
-        try:
-            # 检查是否是 cluster 成员
-            if not self.client.check(f"user:{user}", "member", f"cluster:{cluster}"):
-                return f"用户 '{user}' 不是环境 '{cluster}' 的成员"
-
-            if not self.client.check(f"user:{user}", "can_execute", f"command:{command}"):
-                return f"用户 '{user}' 没有执行命令 '{command}' 的权限"
-            if not self.client.check(f"user:{user}", "can_access", f"target:{target}"):
-                return f"用户 '{user}' 没有访问主机 '{target}' 的权限"
-            return ""
-
-        except Exception as e:
-            return f"权限检查失败: {e}"
+def _client(config: OpenFGAConfig) -> OpenFgaClient:
+    return OpenFgaClient(
+        ClientConfiguration(
+            api_url=config.api_url,
+            store_id=config.store_id,
+            authorization_model_id=config.authorization_model_id,
+        )
+    )
 
 
 def require_permission(command: str, target_param: str = "tgt"):
     """权限检查装饰器。
 
-    自动从方法参数中提取 target，从 self.cluster_name 获取 cluster，
-    从 self.permission_checker 获取检查器。权限不足时打印错误并提前返回。
-
-    Args:
-        command: 命令名称，如 "ping"、"cmd"。
-        target_param: 目标主机参数名，默认为 "tgt"。
-
-    Returns:
-        方法装饰器。
+    从 self.no_auth 读取是否跳过检查，从 self.cluster_name 获取集群名。
+    OpenFGA 未初始化时自动跳过（降级放行）。
 
     Example:
         @require_permission("ping")
         def __call__(self, tgt="*"):
             ...
     """
+
     def decorator(method: Callable) -> Callable:
         @wraps(method)
         def wrapper(self, *args, **kwargs) -> Any:
-            checker: Optional[PermissionChecker] = getattr(self, "permission_checker", None)
-            if checker and checker.enabled:
-                # 从参数中提取 target
-                sig = inspect.signature(method)
-                params = list(sig.parameters.keys())
+            if getattr(self, "no_auth", False):
+                return method(self, *args, **kwargs)
 
-                if target_param in kwargs:
-                    target = kwargs[target_param]
-                elif target_param in params:
-                    idx = params.index(target_param) - 1  # 减去 self
-                    target = args[idx] if idx < len(args) else sig.parameters[target_param].default
-                else:
-                    target = "*"
+            config = load_config()
+            if not config.is_initialized():
+                return method(self, *args, **kwargs)
 
-                cluster = getattr(self, "cluster_name", "default")
-                formatter = getattr(self, "formatter", None)
+            sig = inspect.signature(method)
+            params = list(sig.parameters.keys())
+            if target_param in kwargs:
+                target = kwargs[target_param]
+            elif target_param in params:
+                idx = params.index(target_param) - 1
+                target = (
+                    args[idx]
+                    if idx < len(args)
+                    else sig.parameters[target_param].default
+                )
+            else:
+                target = "*"
 
-                try:
-                    checker.require(command, str(target), cluster)
-                except PermissionDeniedError as e:
-                    if formatter:
-                        formatter.print_error(str(e))
-                    else:
-                        print(f"错误: {e}")
-                    return
+            cluster = getattr(self, "cluster_name", "default")
+            user = getattr(self, "username", None)
+            formatter = getattr(self, "formatter", None)
+
+            if not user:
+                msg = "权限检查失败: 未指定用户名，请使用 --user 参数"
+                formatter.print_error(msg) if formatter else print(f"错误: {msg}")
+                return
+
+            try:
+                fga = _client(config)
+                checks = [
+                    fga.check(
+                        ClientCheckRequest(
+                            user=f"user:{user}",
+                            relation="member",
+                            object=f"cluster:{cluster}",
+                        )
+                    ).allowed,
+                    fga.check(
+                        ClientCheckRequest(
+                            user=f"user:{user}",
+                            relation="can_execute",
+                            object=f"command:{command}",
+                        )
+                    ).allowed,
+                ]
+                # 通配符 target 跳过 can_access 检查
+                if "*" not in str(target) and "?" not in str(target):
+                    checks.append(
+                        fga.check(
+                            ClientCheckRequest(
+                                user=f"user:{user}",
+                                relation="can_access",
+                                object=f"target:{target}",
+                            )
+                        ).allowed
+                    )
+                allowed = all(checks)
+            except Exception as e:
+                msg = f"权限检查失败: {e}"
+                formatter.print_error(msg) if formatter else print(f"错误: {msg}")
+                return
+
+            if not allowed:
+                msg = f"权限被拒绝: user={user}, command={command}, target={target}, cluster={cluster}"
+                formatter.print_error(msg) if formatter else print(f"错误: {msg}")
+                return
 
             return method(self, *args, **kwargs)
+
         return wrapper
+
     return decorator

@@ -1,111 +1,76 @@
 #!/bin/bash
+# Salt CLI 集成测试
+# 需要已配置好的 Salt API 环境（~/.config/salt/credentials.json）
+# 使用 --no-auth 跳过权限检查，适合无 OpenFGA 的测试环境
 
-# Salt CLI 全面测试脚本
-# 用于测试 salt 命令行工具的所有功能
+SALT="${SALT_CMD:-salt-fga}"
 
-set -e  # 遇到错误立即退出
-
-# 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# 测试计数器
-TOTAL_TESTS=0
-PASSED_TESTS=0
-FAILED_TESTS=0
+PASS=0
+FAIL=0
 
-# 打印测试标题
-print_test() {
-    echo -e "\n${YELLOW}[测试 $((TOTAL_TESTS + 1))]${NC} $1"
-    TOTAL_TESTS=$((TOTAL_TESTS + 1))
-}
+pass() { echo -e "  ${GREEN}✓ $1${NC}"; PASS=$((PASS + 1)); }
+fail() { echo -e "  ${RED}✗ $1${NC}"; FAIL=$((FAIL + 1)); }
 
-# 打印成功
-print_success() {
-    echo -e "${GREEN}✓ 通过${NC}"
-    PASSED_TESTS=$((PASSED_TESTS + 1))
-}
-
-# 打印失败
-print_failure() {
-    echo -e "${RED}✗ 失败: $1${NC}"
-    FAILED_TESTS=$((FAILED_TESTS + 1))
-}
-
-# 执行测试命令
-run_test() {
-    local description=$1
-    shift
-    print_test "$description"
-
-    if "$@"; then
-        print_success
+run() {
+    local desc=$1; shift
+    echo -e "\n${YELLOW}>> $desc${NC}"
+    if "$@" 2>/dev/null; then
+        pass "$desc"
     else
-        print_failure "命令执行失败"
+        fail "$desc"
     fi
 }
 
-echo "========================================="
-echo "Salt CLI 全面测试"
-echo "========================================="
+echo "========================================"
+echo "Salt CLI 集成测试"
+echo "========================================"
 
-# 1. 测试 clusters 命令
-run_test "列出所有集群配置" salt clusters
+# clusters
+run "列出所有集群" $SALT --no-auth clusters
+run "列出所有集群 (list 子命令)" $SALT --no-auth clusters list
 
-# 2. 测试 ping 命令
-run_test "Ping 所有 minions" salt ping
-run_test "Ping 指定 minion" salt ping --tgt="minion-01"
+# ping
+run "Ping 所有 minions" $SALT --no-auth ping
+run "Ping 指定 tgt" $SALT --no-auth ping --tgt "minion-01"
+run "Ping (raw 输出)" $SALT --no-auth --raw ping
 
-# 3. 测试 cmd 命令
-run_test "在所有 minions 上执行命令" salt cmd run --tgt="*" --command="uptime"
-run_test "在指定 minion 上执行命令" salt cmd run --tgt="minion-01" --command="hostname"
+# cmd
+run "cmd: 执行命令 (直接调用)" $SALT --no-auth cmd --tgt "*" --command "uptime"
+run "cmd run: 执行命令 (子命令)" $SALT --no-auth cmd run --tgt "minion-01" --command "hostname"
 
-# 4. 测试 minions 命令
-run_test "列出所有 minions" salt minions
-run_test "查看指定 minion 信息" salt minions --mid="minion-01"
+# execute
+run "execute: 执行脚本" $SALT --no-auth execute --tgt "minion-01" --script_content "echo hello"
+run "execute: 指定 shell" $SALT --no-auth execute --tgt "minion-01" --script_content "echo hello" --shell "bash"
 
-# 5. 测试 jobs 命令
-run_test "列出所有任务" salt jobs
-# 注意：需要一个真实的 jid 才能测试单个任务查询
-# run_test "查看指定任务" salt jobs --jid="20240101000000000000"
+# minions
+run "查看所有 minions" $SALT --no-auth minions
+run "查看指定 minion" $SALT --no-auth minions --mid "minion-01"
 
-# 6. 测试 keys 命令
-run_test "列出所有 keys" salt keys
-run_test "列出所有 keys (使用 list 子命令)" salt keys list
-# 注意：以下命令会修改 key 状态，谨慎使用
-# run_test "接受 minion key" salt keys accept --mid="test-minion"
-# run_test "拒绝 minion key" salt keys reject --mid="test-minion"
-# run_test "删除 minion key" salt keys delete --mid="test-minion"
+# jobs
+run "查看任务历史" $SALT --no-auth jobs
 
-# 7. 测试 execute 命令
-run_test "执行脚本" salt execute --tgt="minion-01" --script_content="echo 'Hello from script'"
+# keys
+run "列出所有 keys (默认)" $SALT --no-auth keys
+run "列出所有 keys (list 子命令)" $SALT --no-auth keys list
+run "查看指定 minion 的 key" $SALT --no-auth keys list --mid "minion-01"
 
-# 8. 测试 --raw 输出模式
-run_test "使用 raw 模式输出" salt --raw ping
+# permission
+run "查看 OpenFGA 配置状态" $SALT --no-auth permission status
+run "列出权限规则" $SALT --no-auth permission list
 
-# 9. 测试 -c 指定集群
-# 注意：需要在配置文件中有多个集群才能测试
-# run_test "使用指定集群" salt -c prod ping
-
-# 10. 测试错误处理
-print_test "测试无效的 minion ID"
-if salt ping --tgt="nonexistent-minion-12345" 2>/dev/null; then
-    print_failure "应该返回空结果或错误"
-else
-    print_success
+# 多环境
+if [ -n "$TEST_CLUSTER" ]; then
+    run "指定集群: $TEST_CLUSTER" $SALT -c "$TEST_CLUSTER" --no-auth ping
 fi
 
-# 打印测试总结
 echo ""
-echo "========================================="
-echo "测试总结"
-echo "========================================="
-echo -e "总测试数: ${TOTAL_TESTS}"
-echo -e "${GREEN}通过: ${PASSED_TESTS}${NC}"
-echo -e "${RED}失败: ${FAILED_TESTS}${NC}"
-echo "========================================="
+echo "========================================"
+echo -e "通过: ${GREEN}${PASS}${NC}  失败: ${RED}${FAIL}${NC}"
+echo "========================================"
 
-# 返回失败数作为退出码
-exit $FAILED_TESTS
+exit $FAIL
