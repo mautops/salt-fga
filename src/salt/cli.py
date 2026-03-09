@@ -18,6 +18,7 @@ from .commands.cmd import CmdCommand
 
 # 导入权限模块
 import sys, os
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__))))
 from openfga import PermissionChecker, PermissionCommand
 from openfga.config import OpenFGAConfigManager
@@ -49,7 +50,7 @@ class SaltCLI:
             sys.exit(1)
 
         # 获取环境名称
-        cluster_name = self.cluster_config.get("name", "default")
+        cluster_name = self.cluster_config.name
 
         # 初始化组件
         self.token_manager = TokenManager(self.config_manager.config_dir)
@@ -62,8 +63,12 @@ class SaltCLI:
         # 注册子命令，传入权限检查器
         self.clusters = ClustersCommand(self.config_manager, self.formatter)
         self.ping = PingCommand(self.client, self.formatter, perm_checker, cluster_name)
-        self.execute = ExecuteCommand(self.client, self.formatter, perm_checker, cluster_name)
-        self.minions = MinionsCommand(self.client, self.formatter, perm_checker, cluster_name)
+        self.execute = ExecuteCommand(
+            self.client, self.formatter, perm_checker, cluster_name
+        )
+        self.minions = MinionsCommand(
+            self.client, self.formatter, perm_checker, cluster_name
+        )
         self.jobs = JobsCommand(self.client, self.formatter, perm_checker, cluster_name)
         self.keys = KeysCommand(self.client, self.formatter, perm_checker, cluster_name)
         self.cmd = CmdCommand(self.client, self.formatter, perm_checker, cluster_name)

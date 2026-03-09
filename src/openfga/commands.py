@@ -74,40 +74,20 @@ class PermissionCommand:
             raise RuntimeError("OpenFGA 未初始化，请先运行 'salt permission init'")
         return OpenFGAClientWrapper(self.config)
 
-    def init(self, name: str = "salt-cli", model_json: Optional[str] = None):
+    def init(self, name: str = "salt-cli"):
         """初始化 OpenFGA Store 和授权模型（需要管理员权限）。
 
         Args:
             name: Store 名称，默认为 "salt-cli"。
-            model_json: 授权模型 JSON 文件路径（可选），不指定时使用内置文件。
         """
         try:
             self._require_admin()
             self.console.print("[bold]初始化 OpenFGA Store...[/bold]")
-            store_manager = StoreManager(self.config_manager)
-            if model_json:
-                config = store_manager.init_store_from_json(name=name, model_json_path=Path(model_json))
-            else:
-                # 尝试从 JSON 文件初始化，如果不存在则提示用户
-                model_json_path = Path(__file__).parent / "authorization_model.json"
-                if model_json_path.exists():
-                    config = store_manager.init_store_from_json(name=name, model_json_path=model_json_path)
-                else:
-                    # 提示用户生成 JSON 文件
-                    fga_file = Path(__file__).parent / "authorization_model.fga"
-                    self.console.print(
-                        f"[yellow]提示: 未找到 authorization_model.json[/yellow]\n"
-                        f"请先运行以下命令生成 JSON 文件:\n"
-                        f"  fga model transform --file {fga_file} > {model_json_path}\n"
-                        f"然后重新运行 'salt permission init'"
-                    )
-                    return
-
+            config = StoreManager(self.config_manager).init_store(name=name)
             self.console.print(f"[green]✓ 初始化完成[/green]")
             self.console.print(f"  Store ID: {config.store_id}")
             self.console.print(f"  Model ID: {config.authorization_model_id}")
             self.console.print(f"  API URL: {config.api_url}")
-
         except Exception as e:
             self.console.print(f"[red]错误: {e}[/red]")
 
@@ -338,9 +318,9 @@ class PermissionCommand:
             client = self._get_client()
 
             client.write_tuples([{
-                "user": f"target:{target}",
+                "user": f"target_group:{group}",
                 "relation": "group",
-                "object": f"target_group:{group}",
+                "object": f"target:{target}",
             }])
 
             self.console.print(
@@ -362,9 +342,9 @@ class PermissionCommand:
             client = self._get_client()
 
             client.delete_tuples([{
-                "user": f"target:{target}",
+                "user": f"target_group:{group}",
                 "relation": "group",
-                "object": f"target_group:{group}",
+                "object": f"target:{target}",
             }])
 
             self.console.print(

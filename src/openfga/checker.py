@@ -95,14 +95,14 @@ class PermissionChecker:
             if not self.client.check(f"user:{user}", "can_execute", f"command:{command}"):
                 return False
 
-            # 3. 查询 target 归属的 target_group
-            tuples = self.client.read_tuples(user=f"target:{target}", relation="group")
+            # 3. 查询 target 归属的 target_group（object=target:xxx, relation=group）
+            tuples = self.client.read_tuples(object=f"target:{target}", relation="group")
             if not tuples:
                 return False
 
             # 4. 检查用户对 target_group 是否有访问权限
             for t in tuples:
-                if self.client.check(f"user:{user}", "can_access", t["object"]):
+                if self.client.check(f"user:{user}", "can_access", t["user"]):
                     return True
 
             return False
@@ -155,7 +155,7 @@ class PermissionChecker:
                 return f"用户 '{user}' 没有执行命令 '{command}' 的权限"
 
             # 检查目标主机权限
-            tuples = self.client.read_tuples(user=f"target:{target}", relation="group")
+            tuples = self.client.read_tuples(object=f"target:{target}", relation="group")
             if not tuples:
                 return f"目标主机 '{target}' 不属于任何目标组"
 
