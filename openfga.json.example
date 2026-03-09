@@ -1,0 +1,9 @@
+{
+  "api_url": "http://localhost:8080",
+  "store_id": "01JCXXX...",
+  "authorization_model_id": "01JCYYY...",
+  "admins": [
+    "admin",
+    "root"
+  ]
+}

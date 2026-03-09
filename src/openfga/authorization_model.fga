@@ -1,0 +1,41 @@
+model
+  schema 1.1
+
+# 用户类型 - 代表系统中的用户
+type user
+
+# 环境/集群类型 - 代表不同的部署环境（如 prod, dev, test）
+type cluster
+  relations
+    # 环境管理员 - 对环境有完全控制权
+    define admin: [user]
+    # 环境成员 - 可以访问环境，包括管理员
+    define member: [user] or admin
+
+# 目标主机组类型 - 代表一组主机（如 web-servers, db-servers）
+type target_group
+  relations
+    # 组管理员 - 对组有完全控制权
+    define admin: [user]
+    # 可访问权限 - 用户或集群成员可以访问此组
+    define can_access: [user, cluster#member] or admin
+
+# 目标主机类型 - 代表 Salt minion 主机
+type target
+  relations
+    # 主机所属的组
+    define group: [target_group]
+    # 可访问权限 - 继承自所属组的访问权限
+    define can_access: can_access from group
+
+# 命令类型 - 代表可执行的 Salt 命令（如 ping, cmd, execute）
+type command
+  relations
+    # 可执行权限 - 用户或集群成员可以执行此命令
+    define can_execute: [user, cluster#member]
+
+# Salt 权限管理类型 - 用于管理权限系统本身
+type salt_permission
+  relations
+    # 可管理权限 - 可以管理权限系统的用户
+    define can_manage: [user]

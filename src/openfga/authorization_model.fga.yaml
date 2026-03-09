@@ -1,0 +1,181 @@
+# OpenFGA 授权模型测试文件
+# 运行测试: fga model test --tests src/openfga/authorization_model.fga.yaml
+
+name: Salt CLI Authorization Model Tests
+
+model_file: ./authorization_model.fga
+
+# 测试用例
+tuples:
+  # 用户 alice 是 prod 环境的管理员
+  - user: user:alice
+    relation: admin
+    object: cluster:prod
+
+  # 用户 bob 是 prod 环境的普通成员
+  - user: user:bob
+    relation: member
+    object: cluster:prod
+
+  # 用户 charlie 是 dev 环境的成员
+  - user: user:charlie
+    relation: member
+    object: cluster:dev
+
+  # 创建目标组 web-servers
+  - user: user:alice
+    relation: admin
+    object: target_group:web-servers
+
+  # prod 环境成员可以访问 web-servers 组
+  - user: cluster:prod#member
+    relation: can_access
+    object: target_group:web-servers
+
+  # 主机 web-001 属于 web-servers 组
+  - user: target:web-001
+    relation: group
+    object: target_group:web-servers
+
+  # 主机 web-002 属于 web-servers 组
+  - user: target:web-002
+    relation: group
+    object: target_group:web-servers
+
+  # prod 环境成员可以执行 ping 命令
+  - user: cluster:prod#member
+    relation: can_execute
+    object: command:ping
+
+  # prod 环境成员可以执行 cmd 命令
+  - user: cluster:prod#member
+    relation: can_execute
+    object: command:cmd
+
+  # alice 可以执行 execute 命令（个人授权）
+  - user: user:alice
+    relation: can_execute
+    object: command:execute
+
+tests:
+  # 测试 1: alice 是 prod 管理员，也是成员
+  - name: alice_is_prod_admin
+    check:
+      - user: user:alice
+        object: cluster:prod
+        assertions:
+          admin: true
+          member: true
+
+  # 测试 2: bob 是 prod 成员，但不是管理员
+  - name: bob_is_prod_member
+    check:
+      - user: user:bob
+        object: cluster:prod
+        assertions:
+          member: true
+          admin: false
+
+  # 测试 3: charlie 不是 prod 成员
+  - name: charlie_not_prod_member
+    check:
+      - user: user:charlie
+        object: cluster:prod
+        assertions:
+          member: false
+
+  # 测试 4: prod 成员可以访问 web-servers 组
+  - name: prod_member_can_access_web_servers
+    check:
+      - user: cluster:prod#member
+        object: target_group:web-servers
+        assertions:
+          can_access: true
+
+  # 测试 5: alice 可以访问 web-servers 组（作为 prod 成员）
+  - name: alice_can_access_web_servers
+    check:
+      - user: user:alice
+        object: target_group:web-servers
+        assertions:
+          can_access: true
+
+  # 测试 6: bob 可以访问 web-servers 组（作为 prod 成员）
+  - name: bob_can_access_web_servers
+    check:
+      - user: user:bob
+        object: target_group:web-servers
+        assertions:
+          can_access: true
+
+  # 测试 7: charlie 不能访问 web-servers 组（不是 prod 成员）
+  - name: charlie_cannot_access_web_servers
+    check:
+      - user: user:charlie
+        object: target_group:web-servers
+        assertions:
+          can_access: false
+
+  # 测试 8: web-001 继承 web-servers 组的访问权限
+  - name: web_001_inherits_access
+    check:
+      - user: user:alice
+        object: target:web-001
+        assertions:
+          can_access: true
+      - user: user:bob
+        object: target:web-001
+        assertions:
+          can_access: true
+      - user: user:charlie
+        object: target:web-001
+        assertions:
+          can_access: false
+
+  # 测试 9: prod 成员可以执行 ping 命令
+  - name: prod_member_can_execute_ping
+    check:
+      - user: cluster:prod#member
+        object: command:ping
+        assertions:
+          can_execute: true
+
+  # 测试 10: alice 可以执行 ping 命令（作为 prod 成员）
+  - name: alice_can_execute_ping
+    check:
+      - user: user:alice
+        object: command:ping
+        assertions:
+          can_execute: true
+
+  # 测试 11: bob 可以执行 cmd 命令（作为 prod 成员）
+  - name: bob_can_execute_cmd
+    check:
+      - user: user:bob
+        object: command:cmd
+        assertions:
+          can_execute: true
+
+  # 测试 12: alice 可以执行 execute 命令（个人授权）
+  - name: alice_can_execute_execute
+    check:
+      - user: user:alice
+        object: command:execute
+        assertions:
+          can_execute: true
+
+  # 测试 13: bob 不能执行 execute 命令（没有授权）
+  - name: bob_cannot_execute_execute
+    check:
+      - user: user:bob
+        object: command:execute
+        assertions:
+          can_execute: false
+
+  # 测试 14: charlie 不能执行 ping 命令（不是 prod 成员）
+  - name: charlie_cannot_execute_ping
+    check:
+      - user: user:charlie
+        object: command:ping
+        assertions:
+          can_execute: false

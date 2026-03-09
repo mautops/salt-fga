@@ -1,0 +1,58 @@
+version: "3.8"
+
+# OpenFGA 本地开发环境
+# 启动命令: docker-compose up -d
+# 停止命令: docker-compose down
+
+services:
+  # Postgres 数据库（OpenFGA 数据存储）
+  postgres:
+    image: postgres:15-alpine
+    container_name: salt-openfga-postgres
+    environment:
+      POSTGRES_USER: openfga
+      POSTGRES_PASSWORD: openfga
+      POSTGRES_DB: openfga
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openfga"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # OpenFGA 数据库迁移
+  migrate:
+    image: openfga/openfga:latest
+    container_name: salt-openfga-migrate
+    command: migrate
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # OpenFGA 服务器
+  openfga:
+    image: openfga/openfga:latest
+    container_name: salt-openfga
+    command: run
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable
+      OPENFGA_HTTP_ADDR: 0.0.0.0:8080
+      OPENFGA_GRPC_ADDR: 0.0.0.0:8081
+      OPENFGA_LOG_LEVEL: info
+    ports:
+      - "8080:8080"  # HTTP API
+      - "8081:8081"  # gRPC API
+      - "3000:3000"  # Playground UI
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

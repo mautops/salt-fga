@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "salt"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fire>=0.7.1",
+    "openfga-sdk>=0.9.9",
+    "requests>=2.32.5",
+    "rich>=14.3.3",
+]
+
+[project.scripts]
+salt = "salt.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/salt"]
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "twine>=6.2.0",
+]
