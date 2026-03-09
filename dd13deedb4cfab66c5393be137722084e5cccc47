@@ -1,0 +1,34 @@
+src/openfga/__init__.py
+  148f52bc5515feaa 4
+src/salt/cli.py
+  148f52bc5515feaa 53
+src/openfga/store_manager.py
+  148f52bc5515feaa 4,19,27,29-36,38-41,43,50,58-60,78-81
+src/openfga/checker.py
+  148f52bc5515feaa 98-99,105,158
+src/openfga/client.py
+  148f52bc5515feaa 7-11,17,20-21,23,27,30-31,34-35,38,42,46-47
+src/openfga/commands.py
+  148f52bc5515feaa 86,321,323,345,347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.9",
+  "base_commit_sha": "dd13deedb4cfab66c5393be137722084e5cccc47",
+  "prompts": {
+    "148f52bc5515feaa": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a978c845-d796-4881-9b77-077e7def64c9",
+        "model": "claude-4.6-sonnet-medium-thinking"
+      },
+      "human_author": "BigFei <364950776@qq.com>",
+      "messages": [],
+      "total_additions": 66,
+      "total_deletions": 284,
+      "accepted_lines": 53,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/bce404808202675b906b4e8945daea0e425b9de68be6abe113d7cd0814e54e4e"
+    }
+  }
+}
