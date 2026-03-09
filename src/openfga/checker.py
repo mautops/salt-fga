@@ -87,25 +87,13 @@ class PermissionChecker:
             user = self.get_current_user()
 
         try:
-            # 1. 检查用户是否是 cluster 成员
             if not self.client.check(f"user:{user}", "member", f"cluster:{cluster}"):
                 return False
-
-            # 2. 检查用户对 command 是否有执行权限
             if not self.client.check(f"user:{user}", "can_execute", f"command:{command}"):
                 return False
-
-            # 3. 查询 target 归属的 target_group（object=target:xxx, relation=group）
-            tuples = self.client.read_tuples(object=f"target:{target}", relation="group")
-            if not tuples:
+            if not self.client.check(f"user:{user}", "can_access", f"target:{target}"):
                 return False
-
-            # 4. 检查用户对 target_group 是否有访问权限
-            for t in tuples:
-                if self.client.check(f"user:{user}", "can_access", t["user"]):
-                    return True
-
-            return False
+            return True
 
         except Exception as e:
             print(f"权限检查失败: {e}")
@@ -150,16 +138,11 @@ class PermissionChecker:
             if not self.client.check(f"user:{user}", "member", f"cluster:{cluster}"):
                 return f"用户 '{user}' 不是环境 '{cluster}' 的成员"
 
-            # 检查命令权限
             if not self.client.check(f"user:{user}", "can_execute", f"command:{command}"):
                 return f"用户 '{user}' 没有执行命令 '{command}' 的权限"
-
-            # 检查目标主机权限
-            tuples = self.client.read_tuples(object=f"target:{target}", relation="group")
-            if not tuples:
-                return f"目标主机 '{target}' 不属于任何目标组"
-
-            return f"用户 '{user}' 没有访问目标主机 '{target}' 的权限"
+            if not self.client.check(f"user:{user}", "can_access", f"target:{target}"):
+                return f"用户 '{user}' 没有访问主机 '{target}' 的权限"
+            return ""
 
         except Exception as e:
             return f"权限检查失败: {e}"
