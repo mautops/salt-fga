@@ -1,0 +1,23 @@
+pyproject.toml
+  fd55d0e484766c67 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.9",
+  "base_commit_sha": "b058adf68bbb5fc093b3b213a2c24199e7377fc0",
+  "prompts": {
+    "fd55d0e484766c67": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6ee8aeb8-5229-4335-b045-1422695c308b",
+        "model": "claude-4.6-sonnet-medium-thinking"
+      },
+      "human_author": "BigFei <364950776@qq.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
