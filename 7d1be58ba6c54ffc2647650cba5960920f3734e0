@@ -1,0 +1,28 @@
+src/openfga/authorization_model.fga
+  148f52bc5515feaa 13
+src/openfga/checker.py
+  148f52bc5515feaa 94,143-145
+src/openfga/commands.py
+  148f52bc5515feaa 18,35,48-51,53-54,70,72,76-77,92,96-97,106-107,110-112,116-117,120,122,126-127,131-132,136-137,140,142,151-152,157,173,178,184,193,212,215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.9",
+  "base_commit_sha": "7d1be58ba6c54ffc2647650cba5960920f3734e0",
+  "prompts": {
+    "148f52bc5515feaa": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a978c845-d796-4881-9b77-077e7def64c9",
+        "model": "claude-4.6-sonnet-medium-thinking"
+      },
+      "human_author": "BigFei <364950776@qq.com>",
+      "messages": [],
+      "total_additions": 76,
+      "total_deletions": 332,
+      "accepted_lines": 48,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/1671875e14d92641c96fc65e993f6a7678c67913e3d5119f148fc059df76a632"
+    }
+  }
+}
