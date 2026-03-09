@@ -1,8 +1,5 @@
 """execute 命令 - 执行脚本"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 from openfga import require_permission
 
 from ..client import SaltAPIClient

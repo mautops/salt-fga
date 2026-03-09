@@ -1,8 +1,5 @@
 """minions 命令 - 查看和管理 minions"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 from openfga import require_permission
 
 from typing import Optional

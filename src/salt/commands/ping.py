@@ -1,8 +1,5 @@
 """ping 命令 - 测试 minion 连接"""
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 from openfga import require_permission
 
 from ..client import SaltAPIClient
